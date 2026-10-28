@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Elite Drive"
+version = "1.0.0"
+id = "artifacts/elite-drive"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18333
+
+[services.development]
+run = "pnpm --filter @workspace/elite-drive run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/elite-drive", "run", "build" ]
+
+[services.production.run]
+args = [ "pnpm", "--filter", "@workspace/elite-drive", "run", "start" ]
+
+[services.production.run.env]
+NODE_ENV = "production"
+
+[services.env]
+PORT = "18333"
+BASE_PATH = "/"

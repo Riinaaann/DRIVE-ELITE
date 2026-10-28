@@ -1,0 +1,1 @@
+pg_dump "postgresql://neondb_owner:npg_ireoGl6EPSh7@ep-falling-thunder-ak1l6677.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require" --clean --if-exists --no-owner --no-privileges --inserts > ~/workspace/supabase_database.sql

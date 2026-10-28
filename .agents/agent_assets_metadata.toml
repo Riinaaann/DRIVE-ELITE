@@ -1,0 +1,24 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "AThcHN5dDn_DEDJ9loxB9"
+uri = "file://exports/elite-drive-nextjs.zip"
+type = "unspecified"
+title = "Elite Drive — Complete Next.js Source"
+description = "Complete Elite Drive source export including the Next.js frontend, API server, database schema, generated API client, OpenAPI files, workspace configuration, and setup README. Dependencies and build caches are excluded."
+logical_id = "ac687625-b8b2-4327-8d9d-191ab4009f74"
+
+[[outputs]]
+id = "8_XipXS8b056IR1NMm2IP"
+uri = "file://artifacts/my_database.sql"
+type = "unspecified"
+title = "Elite Drive complete database SQL"
+description = "Complete PostgreSQL dump of the current Elite Drive database, including schema, enums, sequences, constraints, users, vehicles, and the bookings table. The bookings table currently contains no rows."
+logical_id = "ffb18f3a-58b3-440c-bacc-c8201801c724"
+content_hash = "sha256:92b9048ace0f49b79d54f5dee977e8ca672e681dbddb210c1e30d5e5d6d08031"
+size = 8848
+mtime_ms = 1790439963179
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:2a128b26-7089-4a09-83fd-47973c59a118/ffb18f3a-58b3-440c-bacc-c8201801c724/425d0ce7-ce0f-4d25-ba73-e47dd16e0a05"
+storage_version_token = "1790611032620829"
+content_type = "application/octet-stream"

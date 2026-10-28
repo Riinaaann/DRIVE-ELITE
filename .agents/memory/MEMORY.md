@@ -1,0 +1,1 @@
+- [Next.js migration](next-migration.md) — browser-dependent legacy routers need a client-only App Router boundary and no competing route directory.
