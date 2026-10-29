@@ -10,12 +10,37 @@ function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password + "elite_drive_salt").digest("hex");
 }
 
-function generateToken(userId: number): string {
-  return crypto.createHash("sha256").update(`${userId}_${Date.now()}_elite_drive`).digest("hex");
+const tokenStore = new Map<string, number>();
+
+export function generateToken(userId: number): string {
+  const payload = `${userId}:${Date.now()}:${crypto.randomBytes(4).toString("hex")}`;
+  const sig = crypto.createHmac("sha256", "elite_drive_auth_salt").update(payload).digest("hex");
+  const token = `${Buffer.from(payload).toString("base64url")}.${sig}`;
+  tokenStore.set(token, userId);
+  return token;
 }
 
-// Simple in-memory token store (in production use Redis or DB)
-const tokenStore = new Map<string, number>();
+export function getUserIdFromToken(token: string): number | null {
+  if (tokenStore.has(token)) {
+    return tokenStore.get(token)!;
+  }
+  try {
+    const [payloadB64, sig] = token.split(".");
+    if (payloadB64 && sig) {
+      const payload = Buffer.from(payloadB64, "base64url").toString("utf-8");
+      const expectedSig = crypto.createHmac("sha256", "elite_drive_auth_salt").update(payload).digest("hex");
+      if (expectedSig === sig) {
+        const [userIdStr] = payload.split(":");
+        const uid = parseInt(userIdStr, 10);
+        if (!isNaN(uid)) {
+          tokenStore.set(token, uid);
+          return uid;
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
 
 export { tokenStore };
 
@@ -40,7 +65,6 @@ router.post("/register", async (req, res) => {
   }).returning();
 
   const token = generateToken(user.id);
-  tokenStore.set(token, user.id);
 
   return res.status(201).json({
     user: {
@@ -68,7 +92,6 @@ router.post("/login", async (req, res) => {
   }
 
   const token = generateToken(user.id);
-  tokenStore.set(token, user.id);
 
   return res.json({
     user: {
@@ -98,7 +121,7 @@ router.get("/me", async (req, res) => {
     return res.status(401).json({ error: "Not authenticated" });
   }
   const token = authHeader.slice(7);
-  const userId = tokenStore.get(token);
+  let userId = getUserIdFromToken(token);
   if (!userId) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }

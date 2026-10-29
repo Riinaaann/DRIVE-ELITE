@@ -2,9 +2,6 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +18,7 @@ import {
   ArrowRight,
   QrCode,
   AlertCircle,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -114,46 +112,36 @@ export function RazorpayCheckoutModal({
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create payment order");
+      if (res.ok) {
+        setOrderData(data);
+      } else {
+        // Fallback demo order
+        setOrderData({
+          orderId: `order_demo_${Date.now()}`,
+          totalCost,
+          isDemoMode: true,
+        });
       }
-      setOrderData(data);
-    } catch (err: any) {
-      setErrorMessage(err.message || "Could not connect to payment gateway.");
+    } catch {
+      // Fallback demo order
+      setOrderData({
+        orderId: `order_demo_${Date.now()}`,
+        totalCost,
+        isDemoMode: true,
+      });
     } finally {
       setIsInitializing(false);
     }
   };
 
   const handleProcessPayment = async () => {
-    if (!orderData) return;
     setIsProcessing(true);
     setErrorMessage("");
 
     try {
-      const paymentId = `pay_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
-      
-      // Calculate HMAC SHA-256 for test verification or live verify
-      // For demo security test mode, we send simulated Razorpay payload with server secret key match
-      const secret = "elite_drive_secret_key_demo_2026";
-      
-      // Web Crypto API in browser to compute exact SHA-256 HMAC
-      const encoder = new TextEncoder();
-      const keyData = encoder.encode(secret);
-      const cryptoKey = await window.crypto.subtle.importKey(
-        "raw",
-        keyData,
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign"]
-      );
-      const signatureData = encoder.encode(`${orderData.orderId}|${paymentId}`);
-      const signatureBuffer = await window.crypto.subtle.sign("HMAC", cryptoKey, signatureData);
-      const signatureArray = Array.from(new Uint8Array(signatureBuffer));
-      const razorpay_signature = signatureArray.map(b => b.toString(16).padStart(2, "0")).join("");
-
-      // Submit to server verification endpoint
+      const paymentId = `pay_demo_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
       const token = localStorage.getItem("elite_drive_token");
+
       const verifyRes = await fetch("/api/payments/verify", {
         method: "POST",
         headers: {
@@ -161,29 +149,29 @@ export function RazorpayCheckoutModal({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          razorpay_order_id: orderData.orderId,
+          razorpay_order_id: orderData?.orderId || `order_${Date.now()}`,
           razorpay_payment_id: paymentId,
-          razorpay_signature,
+          razorpay_signature: `demo_sig_${Date.now()}`,
           vehicleId: vehicle.id,
           pickupDate,
           returnDate,
-          paymentMethod: `Razorpay - ${activeTab.toUpperCase()}`,
+          paymentMethod: `Instant Demo - ${activeTab.toUpperCase()}`,
         }),
       });
 
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok) {
-        throw new Error(verifyData.error || "Payment signature verification failed.");
+        throw new Error(verifyData.error || "Payment processing could not be completed.");
       }
 
       setIsSuccess(true);
       setTimeout(() => {
         onSuccess(verifyData.booking, verifyData.payment);
         onClose();
-      }, 1400);
+      }, 1200);
 
     } catch (err: any) {
-      setErrorMessage(err.message || "Transaction could not be completed.");
+      setErrorMessage(err.message || "Could not complete transaction. Please try again.");
       setIsProcessing(false);
       setShowOtpScreen(false);
     }
@@ -193,7 +181,7 @@ export function RazorpayCheckoutModal({
     <Dialog open={isOpen} onOpenChange={(open) => !isProcessing && !open && onClose()}>
       <DialogContent className="max-w-md p-0 overflow-hidden border-border/80 rounded-2xl shadow-2xl">
         
-        {/* Razorpay Brand Header */}
+        {/* Brand Header */}
         <div className="bg-slate-950 text-white p-5 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center font-black text-white text-base shadow-md">
@@ -201,7 +189,7 @@ export function RazorpayCheckoutModal({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-sm tracking-wide">Razorpay</span>
+                <span className="font-bold text-sm tracking-wide">Razorpay Gateway</span>
                 <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-emerald-500/40 text-emerald-400 bg-emerald-500/10">
                   <ShieldCheck className="h-3 w-3 mr-0.5" /> SECURE 256-BIT
                 </Badge>
@@ -215,12 +203,21 @@ export function RazorpayCheckoutModal({
           </div>
         </div>
 
+        {/* Demo Mode Notice Banner */}
+        <div className="bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-900/40 px-4 py-2 flex items-center justify-between text-xs text-blue-700 dark:text-blue-300">
+          <div className="flex items-center gap-1.5">
+            <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+            <span className="font-medium">Instant Demo Mode Active</span>
+          </div>
+          <span className="text-[11px] opacity-80">Auto-approves without real card</span>
+        </div>
+
         {/* Loading state */}
         {isInitializing ? (
           <div className="p-12 text-center space-y-3">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-            <p className="text-sm font-medium text-foreground">Initiating Secure Gateway Session...</p>
-            <p className="text-xs text-muted-foreground">Connecting to Razorpay Order API</p>
+            <p className="text-sm font-medium text-foreground">Initiating Gateway Session...</p>
+            <p className="text-xs text-muted-foreground">Preparing Instant Demo Checkout</p>
           </div>
         ) : isSuccess ? (
           /* Success Screen */
@@ -229,9 +226,9 @@ export function RazorpayCheckoutModal({
               <CheckCircle2 className="h-10 w-10" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-foreground">Payment Successful!</h3>
+              <h3 className="text-xl font-bold text-foreground">Payment Approved!</h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Verified with Razorpay HMAC SHA-256 signature
+                Your reservation has been locked and confirmed.
               </p>
             </div>
             <div className="bg-muted/50 rounded-xl p-4 text-xs space-y-1.5 text-left border border-border/40 font-mono">
@@ -245,7 +242,7 @@ export function RazorpayCheckoutModal({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status:</span>
-                <span className="text-emerald-600 font-semibold">VERIFIED & PAID</span>
+                <span className="text-emerald-600 font-semibold">PAID & CONFIRMED</span>
               </div>
             </div>
           </div>
@@ -261,11 +258,11 @@ export function RazorpayCheckoutModal({
             </div>
 
             <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 rounded-xl p-3.5 text-xs text-blue-800 dark:text-blue-300">
-              An authentication code has been dispatched to your mobile number registered with your payment provider.
+              An authentication code has been simulated for your payment method.
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="otpInput" className="text-xs font-semibold">Enter 6-Digit OTP</Label>
+              <Label htmlFor="otpInput" className="text-xs font-semibold">6-Digit OTP</Label>
               <Input
                 id="otpInput"
                 type="text"
@@ -275,7 +272,7 @@ export function RazorpayCheckoutModal({
                 className="text-center font-mono tracking-widest text-lg font-bold h-11"
               />
               <p className="text-[11px] text-muted-foreground text-center">
-                Demo OTP: <strong>749210</strong> (pre-filled for test verification)
+                Demo OTP: <strong>749210</strong> (pre-filled)
               </p>
             </div>
 
@@ -303,10 +300,10 @@ export function RazorpayCheckoutModal({
                 {isProcessing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                    Verifying...
+                    Approving...
                   </>
                 ) : (
-                  "Confirm & Pay"
+                  "Approve & Confirm"
                 )}
               </Button>
             </div>
@@ -366,7 +363,7 @@ export function RazorpayCheckoutModal({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="upiInput" className="text-xs font-medium">Or enter UPI ID / VPA</Label>
+                  <Label htmlFor="upiInput" className="text-xs font-medium">Or UPI ID / VPA</Label>
                   <Input
                     id="upiInput"
                     placeholder="mobile@upi or id@oksbi"
@@ -477,16 +474,31 @@ export function RazorpayCheckoutModal({
             {/* Action Button */}
             <div className="pt-2">
               <Button
-                onClick={() => setShowOtpScreen(true)}
+                onClick={() => {
+                  if (activeTab === "upi") {
+                    handleProcessPayment();
+                  } else {
+                    setShowOtpScreen(true);
+                  }
+                }}
                 className="w-full h-11 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md flex items-center justify-center gap-2"
-                disabled={!orderData || isProcessing}
+                disabled={isProcessing}
               >
-                <span>Pay ₹{totalCost.toLocaleString("en-IN")} via Razorpay</span>
-                <ArrowRight className="h-4 w-4" />
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                    Processing Payment...
+                  </>
+                ) : (
+                  <>
+                    <span>Pay ₹{totalCost.toLocaleString("en-IN")} via Demo Gateway</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </Button>
               <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground mt-2.5">
                 <Lock className="h-3 w-3 text-emerald-500" />
-                <span>End-to-end encrypted with PCI-DSS Level 1 compliance</span>
+                <span>Instant Demo Gateway • No real money charged</span>
               </div>
             </div>
           </div>
