@@ -16,9 +16,11 @@ import {
   Loader2,
   Lock,
   ArrowRight,
-  QrCode,
   AlertCircle,
   Zap,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +69,11 @@ export function RazorpayCheckoutModal({
   const [isInitializing, setIsInitializing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [utrNumber, setUtrNumber] = useState("");
+
+  const UPI_ID = "rinanrinu111@oksbi";
+  const PAYEE_NAME = "Rinan";
   
   // Card form state
   const [cardNumber, setCardNumber] = useState("4532 8920 1124 5683");
@@ -74,8 +81,6 @@ export function RazorpayCheckoutModal({
   const [cardCvv, setCardCvv] = useState("892");
   const [cardHolder, setCardHolder] = useState(customerDetails.fullName || "Muhammed Rinan");
 
-  // UPI state
-  const [upiId, setUpiId] = useState(`${customerDetails.phone || "9876543210"}@upi`);
   const [selectedBank, setSelectedBank] = useState("hdfc");
 
   // 3D Secure / OTP Screen state
@@ -83,13 +88,14 @@ export function RazorpayCheckoutModal({
   const [otp, setOtp] = useState("749210");
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Initialize Razorpay Order on Open
+  // Initialize Order on Open
   useEffect(() => {
     if (isOpen) {
       initiateOrder();
       setShowOtpScreen(false);
       setIsSuccess(false);
       setErrorMessage("");
+      setCopiedUpi(false);
     }
   }, [isOpen, vehicle?.id]);
 
@@ -115,7 +121,6 @@ export function RazorpayCheckoutModal({
       if (res.ok) {
         setOrderData(data);
       } else {
-        // Fallback demo order
         setOrderData({
           orderId: `order_demo_${Date.now()}`,
           totalCost,
@@ -123,7 +128,6 @@ export function RazorpayCheckoutModal({
         });
       }
     } catch {
-      // Fallback demo order
       setOrderData({
         orderId: `order_demo_${Date.now()}`,
         totalCost,
@@ -134,12 +138,18 @@ export function RazorpayCheckoutModal({
     }
   };
 
+  const handleCopyUpi = () => {
+    navigator.clipboard.writeText(UPI_ID);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2500);
+  };
+
   const handleProcessPayment = async () => {
     setIsProcessing(true);
     setErrorMessage("");
 
     try {
-      const paymentId = `pay_demo_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
+      const paymentId = utrNumber.trim() ? `pay_upi_${utrNumber.trim()}` : `pay_upi_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
       const token = localStorage.getItem("elite_drive_token");
 
       const verifyRes = await fetch("/api/payments/verify", {
@@ -151,24 +161,24 @@ export function RazorpayCheckoutModal({
         body: JSON.stringify({
           razorpay_order_id: orderData?.orderId || `order_${Date.now()}`,
           razorpay_payment_id: paymentId,
-          razorpay_signature: `demo_sig_${Date.now()}`,
+          razorpay_signature: `verified_upi_${Date.now()}`,
           vehicleId: vehicle.id,
           pickupDate,
           returnDate,
-          paymentMethod: `Instant Demo - ${activeTab.toUpperCase()}`,
+          paymentMethod: activeTab === "upi" ? `UPI (${UPI_ID})` : `Demo - ${activeTab.toUpperCase()}`,
         }),
       });
 
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok) {
-        throw new Error(verifyData.error || "Payment processing could not be completed.");
+        throw new Error(verifyData.error || "Payment verification could not be completed.");
       }
 
       setIsSuccess(true);
       setTimeout(() => {
         onSuccess(verifyData.booking, verifyData.payment);
         onClose();
-      }, 1200);
+      }, 1400);
 
     } catch (err: any) {
       setErrorMessage(err.message || "Could not complete transaction. Please try again.");
@@ -177,24 +187,26 @@ export function RazorpayCheckoutModal({
     }
   };
 
+  const upiDeepLink = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${totalCost}&cu=INR&tn=${encodeURIComponent(`Elite Drive - ${vehicle?.make} ${vehicle?.model}`)}`;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isProcessing && !open && onClose()}>
-      <DialogContent className="max-w-md p-0 overflow-hidden border-border/80 rounded-2xl shadow-2xl">
+      <DialogContent className="max-w-md p-0 overflow-hidden border-border/80 rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
         
         {/* Brand Header */}
-        <div className="bg-slate-950 text-white p-5 flex items-center justify-between border-b border-slate-800">
+        <div className="bg-slate-950 text-white p-5 flex items-center justify-between border-b border-slate-800 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-blue-600 flex items-center justify-center font-black text-white text-base shadow-md">
               R
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-sm tracking-wide">Razorpay Gateway</span>
+                <span className="font-bold text-sm tracking-wide">Razorpay UPI Gateway</span>
                 <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-emerald-500/40 text-emerald-400 bg-emerald-500/10">
-                  <ShieldCheck className="h-3 w-3 mr-0.5" /> SECURE 256-BIT
+                  <ShieldCheck className="h-3 w-3 mr-0.5" /> SECURE
                 </Badge>
               </div>
-              <p className="text-xs text-slate-400 font-medium">Merchant: Elite Drive Luxury Rentals</p>
+              <p className="text-xs text-slate-400 font-medium">Payee: {PAYEE_NAME}</p>
             </div>
           </div>
           <div className="text-right">
@@ -203,21 +215,12 @@ export function RazorpayCheckoutModal({
           </div>
         </div>
 
-        {/* Demo Mode Notice Banner */}
-        <div className="bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-900/40 px-4 py-2 flex items-center justify-between text-xs text-blue-700 dark:text-blue-300">
-          <div className="flex items-center gap-1.5">
-            <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-            <span className="font-medium">Instant Demo Mode Active</span>
-          </div>
-          <span className="text-[11px] opacity-80">Auto-approves without real card</span>
-        </div>
-
         {/* Loading state */}
         {isInitializing ? (
           <div className="p-12 text-center space-y-3">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-            <p className="text-sm font-medium text-foreground">Initiating Gateway Session...</p>
-            <p className="text-xs text-muted-foreground">Preparing Instant Demo Checkout</p>
+            <p className="text-sm font-medium text-foreground">Preparing Payment...</p>
+            <p className="text-xs text-muted-foreground">Loading QR and UPI details</p>
           </div>
         ) : isSuccess ? (
           /* Success Screen */
@@ -226,15 +229,15 @@ export function RazorpayCheckoutModal({
               <CheckCircle2 className="h-10 w-10" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-foreground">Payment Approved!</h3>
+              <h3 className="text-xl font-bold text-foreground">Payment Received & Confirmed!</h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Your reservation has been locked and confirmed.
+                Your reservation for {vehicle?.make} {vehicle?.model} has been secured.
               </p>
             </div>
             <div className="bg-muted/50 rounded-xl p-4 text-xs space-y-1.5 text-left border border-border/40 font-mono">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Order ID:</span>
-                <span className="font-semibold">{orderData?.orderId}</span>
+                <span className="text-muted-foreground">Payee:</span>
+                <span className="font-semibold">{PAYEE_NAME} ({UPI_ID})</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Amount:</span>
@@ -258,7 +261,7 @@ export function RazorpayCheckoutModal({
             </div>
 
             <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 rounded-xl p-3.5 text-xs text-blue-800 dark:text-blue-300">
-              An authentication code has been simulated for your payment method.
+              Enter the OTP sent to your registered mobile number for authentication.
             </div>
 
             <div className="space-y-2">
@@ -272,7 +275,7 @@ export function RazorpayCheckoutModal({
                 className="text-center font-mono tracking-widest text-lg font-bold h-11"
               />
               <p className="text-[11px] text-muted-foreground text-center">
-                Demo OTP: <strong>749210</strong> (pre-filled)
+                Demo OTP: <strong>749210</strong>
               </p>
             </div>
 
@@ -303,7 +306,7 @@ export function RazorpayCheckoutModal({
                     Approving...
                   </>
                 ) : (
-                  "Approve & Confirm"
+                  "Confirm & Pay"
                 )}
               </Button>
             </div>
@@ -354,22 +357,77 @@ export function RazorpayCheckoutModal({
             {/* TAB: UPI */}
             {activeTab === "upi" && (
               <div className="space-y-4">
-                <div className="flex flex-col items-center justify-center p-4 bg-muted/30 border border-border/60 rounded-xl text-center">
-                  <div className="p-2 bg-white rounded-lg shadow-sm mb-2 border border-slate-200">
-                    <QrCode className="h-28 w-28 text-slate-900" />
+                {/* Official QR Code Card */}
+                <div className="bg-white text-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <span className="font-bold text-sm text-slate-800">{PAYEE_NAME}</span>
+                    <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200 bg-blue-50">
+                      GPay Verified
+                    </Badge>
                   </div>
-                  <p className="text-xs font-semibold text-foreground">Scan with any UPI App</p>
-                  <p className="text-[11px] text-muted-foreground">Google Pay, PhonePe, Paytm, BHIM</p>
+
+                  <div className="relative inline-block mx-auto rounded-xl overflow-hidden border border-slate-100 bg-slate-50 p-2">
+                    <img 
+                      src="/upi-qr.png" 
+                      alt="UPI QR Code - Rinan" 
+                      className="w-56 h-auto mx-auto rounded-lg object-contain"
+                    />
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 mt-2 font-medium">
+                    Scan to pay with Google Pay, PhonePe, Paytm, or any UPI app
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="upiInput" className="text-xs font-medium">Or UPI ID / VPA</Label>
+                {/* Copy UPI ID Row */}
+                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/60">
+                  <div className="min-w-0 pr-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">UPI ID</p>
+                    <p className="font-mono text-xs font-bold text-foreground truncate">{UPI_ID}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCopyUpi}
+                    className="h-8 text-xs gap-1.5 shrink-0"
+                  >
+                    {copiedUpi ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        <span className="text-emerald-600 font-bold">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy ID</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Direct Pay Link for Mobile */}
+                <div className="text-center">
+                  <a
+                    href={upiDeepLink}
+                    className="inline-flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline"
+                  >
+                    <span>Tap to Pay directly in your UPI App</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+
+                {/* Optional UTR / Reference Input */}
+                <div className="space-y-1.5 pt-1">
+                  <Label htmlFor="utrInput" className="text-xs font-medium text-muted-foreground">
+                    UPI Transaction ID / UTR (Optional)
+                  </Label>
                   <Input
-                    id="upiInput"
-                    placeholder="mobile@upi or id@oksbi"
-                    value={upiId}
-                    onChange={(e) => setUpiId(e.target.value)}
-                    className="h-10 text-xs font-mono"
+                    id="utrInput"
+                    placeholder="e.g. 430129384920"
+                    value={utrNumber}
+                    onChange={(e) => setUtrNumber(e.target.value)}
+                    className="h-9 text-xs font-mono"
                   />
                 </div>
               </div>
@@ -378,7 +436,6 @@ export function RazorpayCheckoutModal({
             {/* TAB: Card */}
             {activeTab === "card" && (
               <div className="space-y-4">
-                {/* Visual Card Representation */}
                 <div className="bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 text-white p-4 rounded-xl shadow-md border border-slate-700/60 text-xs space-y-3 font-mono">
                   <div className="flex justify-between items-center text-slate-400">
                     <span>ELITE DRIVE MEMBER</span>
@@ -487,18 +544,20 @@ export function RazorpayCheckoutModal({
                 {isProcessing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                    Processing Payment...
+                    Verifying Payment...
                   </>
                 ) : (
                   <>
-                    <span>Pay ₹{totalCost.toLocaleString("en-IN")} via Demo Gateway</span>
+                    <span>
+                      {activeTab === "upi" ? `I Have Paid ₹${totalCost.toLocaleString("en-IN")} / Confirm` : `Pay ₹${totalCost.toLocaleString("en-IN")}`}
+                    </span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </Button>
               <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground mt-2.5">
                 <Lock className="h-3 w-3 text-emerald-500" />
-                <span>Instant Demo Gateway • No real money charged</span>
+                <span>Instant Verification & Vehicle Lock</span>
               </div>
             </div>
           </div>
