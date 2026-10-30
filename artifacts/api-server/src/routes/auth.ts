@@ -51,19 +51,48 @@ router.post("/register", async (req, res) => {
   }
   const { name, email, password, role } = parsed.data;
 
+  // 1. Prohibit admin registration via public sign up
+  if (role === "admin") {
+    return res.status(403).json({ 
+      error: "Administrator accounts cannot be created via public registration. Please log in using established administrator credentials." 
+    });
+  }
+
   const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
   if (existing.length > 0) {
-    return res.status(400).json({ error: "Email already in use" });
+    return res.status(400).json({ error: "Email or phone already in use" });
   }
+
+  // 2. Customers are verified immediately. Staff members require administrative approval.
+  const isStaff = role === "staff";
+  const isVerified = !isStaff;
 
   const [user] = await db.insert(usersTable).values({
     name,
     email,
     password: hashPassword(password),
     role: (role as any) ?? "customer",
-    isVerified: false,
+    isVerified,
   }).returning();
 
+  // If staff, do NOT issue a login token. Require admin approval.
+  if (isStaff) {
+    return res.status(201).json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isVerified: false,
+        createdAt: user.createdAt.toISOString(),
+      },
+      token: null,
+      message: "Staff registration submitted. Your account is pending administrative approval before you can log in.",
+      requiresApproval: true,
+    });
+  }
+
+  // Customers receive an active session token right away
   const token = generateToken(user.id);
 
   return res.status(201).json({
@@ -72,7 +101,7 @@ router.post("/register", async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      isVerified: user.isVerified,
+      isVerified: true,
       createdAt: user.createdAt.toISOString(),
     },
     token,
@@ -88,7 +117,14 @@ router.post("/login", async (req, res) => {
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
   if (!user || user.password !== hashPassword(password)) {
-    return res.status(401).json({ error: "Invalid email or password" });
+    return res.status(401).json({ error: "Invalid email/phone or password" });
+  }
+
+  // Staff members must be approved by an administrator before logging in
+  if (user.role === "staff" && !user.isVerified) {
+    return res.status(403).json({
+      error: "Your staff account is currently pending administrative approval. An administrator must approve your account before you can log in."
+    });
   }
 
   const token = generateToken(user.id);
@@ -106,13 +142,45 @@ router.post("/login", async (req, res) => {
   });
 });
 
+router.post("/reset-password", async (req, res) => {
+  const { email, newPassword } = req.body;
+  if (!email || typeof email !== "string" || !newPassword || typeof newPassword !== "string") {
+    return res.status(400).json({ error: "Email or phone and new password are required." });
+  }
+
+  const cleanIdentifier = email.trim().toLowerCase();
+  if (cleanIdentifier.length < 3) {
+    return res.status(400).json({ error: "Please provide a valid email address or phone number." });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters long." });
+  }
+
+  const users = await db.select().from(usersTable);
+  const user = users.find((u) => u.email.trim().toLowerCase() === cleanIdentifier);
+
+  if (!user) {
+    return res.status(404).json({ error: "No account found with this email or phone number." });
+  }
+
+  await db.update(usersTable)
+    .set({ password: hashPassword(newPassword) })
+    .where(eq(usersTable.id, user.id));
+
+  return res.json({ 
+    success: true, 
+    message: "Password has been successfully reset. You can now log in with your new password." 
+  });
+});
+
 router.post("/logout", async (req, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
     tokenStore.delete(token);
   }
-  return res.json({ success: true, message: "Logged out" });
+  return res.json({ success: true });
 });
 
 router.get("/me", async (req, res) => {
@@ -121,9 +189,9 @@ router.get("/me", async (req, res) => {
     return res.status(401).json({ error: "Not authenticated" });
   }
   const token = authHeader.slice(7);
-  let userId = getUserIdFromToken(token);
+  const userId = getUserIdFromToken(token);
   if (!userId) {
-    return res.status(401).json({ error: "Invalid or expired token" });
+    return res.status(401).json({ error: "Invalid token" });
   }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);

@@ -24,12 +24,12 @@ if (typeof process.loadEnvFile === "function") {
   }
 }
 
-const useRemote = process.env.USE_REMOTE_DB === "true" && Boolean(process.env.DATABASE_URL);
+const useRemote = process.env.USE_REMOTE_DB !== "false" && Boolean(process.env.DATABASE_URL);
 
 let pool: any;
 
 if (useRemote) {
-  console.log("[DB] Using remote PostgreSQL database connection.");
+  console.log("[DB] Using remote PostgreSQL database connection (Supabase).");
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL?.includes("localhost") || process.env.DATABASE_URL?.includes("127.0.0.1")

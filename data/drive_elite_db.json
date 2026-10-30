@@ -37,13 +37,49 @@
       "created_at": "2026-10-29T07:39:30.156Z"
     },
     {
+      "id": 5,
       "name": "New User",
       "email": "newuser@gmail.com",
       "password": "1c15ebad744e6c9d9b93abc72929b9510e6ccabf4ca06e29f9b33d543324314a",
       "role": "customer",
-      "is_verified": false,
-      "id": 5,
+      "is_verified": true,
       "created_at": "2026-10-29T07:44:41.017Z"
+    },
+    {
+      "id": 6,
+      "name": "rinan",
+      "email": "abcd111@gmail.com",
+      "password": "2285864ea07e5163e4408d5116fedaff0450eda168ee0d3c5dd5637731e3c303",
+      "role": "customer",
+      "is_verified": true,
+      "created_at": "2026-10-29T08:07:28.821Z"
+    },
+    {
+      "id": 8,
+      "name": "abc",
+      "email": "abc@gmail.com",
+      "password": "7040ad391eb8fe8f8b69489a44894c48c7d0b231c66e0977f5580bed7dd88076",
+      "role": "customer",
+      "is_verified": false,
+      "created_at": "2026-10-30T18:03:21.272Z"
+    },
+    {
+      "id": 9,
+      "name": "admin",
+      "email": "admin@gmail.com",
+      "password": "7040ad391eb8fe8f8b69489a44894c48c7d0b231c66e0977f5580bed7dd88076",
+      "role": "admin",
+      "is_verified": false,
+      "created_at": "2026-10-30T18:07:29.938Z"
+    },
+    {
+      "name": "staff",
+      "email": "staff@gmail.com",
+      "password": "7040ad391eb8fe8f8b69489a44894c48c7d0b231c66e0977f5580bed7dd88076",
+      "role": "staff",
+      "is_verified": false,
+      "id": 10,
+      "created_at": "2026-10-30T19:01:17.630Z"
     }
   ],
   "vehicles": [
@@ -59,7 +95,7 @@
       "fuel_type": "Petrol",
       "rating": 4.9,
       "image_url": "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=1000&q=80",
-      "is_available": true,
+      "is_available": false,
       "license_plate": "KL-07-ED-1001",
       "description": "The definitive executive flagship sedan offering whisper-quiet comfort, massage seating, and state-of-the-art tech.",
       "created_at": "2026-10-29T07:39:30.163Z"
@@ -70,13 +106,13 @@
       "model": "M4 Competition",
       "year": 2024,
       "category": "Luxury",
-      "daily_rate": 260,
+      "daily_rate": 5000,
       "seats": 4,
       "transmission": "Automatic",
       "fuel_type": "Petrol",
       "rating": 4.8,
       "image_url": "https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=1000&q=80",
-      "is_available": true,
+      "is_available": false,
       "license_plate": "KL-07-ED-1002",
       "description": "Unrivaled track-tuned agility and aggressive styling for the ultimate driving enthusiast.",
       "created_at": "2026-10-29T07:39:30.167Z"
@@ -87,7 +123,7 @@
       "model": "911 Carrera",
       "year": 2024,
       "category": "Luxury",
-      "daily_rate": 350,
+      "daily_rate": 20000,
       "seats": 2,
       "transmission": "Automatic",
       "fuel_type": "Petrol",
@@ -172,7 +208,7 @@
       "model": "Mustang GT",
       "year": 2023,
       "category": "Premium",
-      "daily_rate": 175,
+      "daily_rate": 8000,
       "seats": 4,
       "transmission": "Manual",
       "fuel_type": "Petrol",
@@ -195,6 +231,39 @@
       "total_cost": 840,
       "status": "confirmed",
       "created_at": "2026-10-29T07:39:30.187Z"
+    },
+    {
+      "id": 2,
+      "user_id": 6,
+      "vehicle_id": 1,
+      "pickup_date": "2026-10-30",
+      "return_date": "2026-10-31",
+      "duration_days": 1,
+      "total_cost": 280,
+      "status": "confirmed",
+      "created_at": "2026-10-29T08:09:22.932Z"
+    },
+    {
+      "id": 3,
+      "user_id": 8,
+      "vehicle_id": 2,
+      "pickup_date": "2026-10-31",
+      "return_date": "2026-11-01",
+      "duration_days": 1,
+      "total_cost": 5000,
+      "status": "cancelled",
+      "created_at": "2026-10-30T18:05:55.212Z"
+    },
+    {
+      "user_id": 8,
+      "vehicle_id": 2,
+      "pickup_date": "2026-11-01",
+      "return_date": "2026-11-02",
+      "duration_days": 1,
+      "total_cost": 5000,
+      "status": "confirmed",
+      "id": 4,
+      "created_at": "2026-10-30T19:03:05.323Z"
     }
   ]
 }

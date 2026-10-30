@@ -86,7 +86,7 @@ export default function AdminVehicles() {
               <DialogHeader>
                 <DialogTitle>Add New Vehicle</DialogTitle>
                 <DialogDescription>
-                  Enter the vehicle details, specifications, and upload photos to add it to your fleet.
+                  Enter the vehicle details, specifications, mileage, and upload photos to add it to your fleet.
                 </DialogDescription>
               </DialogHeader>
               <VehicleForm 
@@ -123,6 +123,7 @@ export default function AdminVehicles() {
                   <th className="py-3 px-4 font-medium">Vehicle</th>
                   <th className="py-3 px-4 font-medium">Category</th>
                   <th className="py-3 px-4 font-medium">License Plate</th>
+                  <th className="py-3 px-4 font-medium">Mileage</th>
                   <th className="py-3 px-4 font-medium">Daily Rate</th>
                   <th className="py-3 px-4 font-medium">Status</th>
                   <th className="py-3 px-4 font-medium text-right">Actions</th>
@@ -130,9 +131,9 @@ export default function AdminVehicles() {
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={6} className="py-8 text-center">Loading...</td></tr>
+                  <tr><td colSpan={7} className="py-8 text-center">Loading...</td></tr>
                 ) : !vehicles?.length ? (
-                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No vehicles found.</td></tr>
+                  <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No vehicles found.</td></tr>
                 ) : vehicles.map(v => (
                   <tr key={v.id} className="border-b border-border/40 last:border-0 hover:bg-muted/10 transition-colors">
                     <td className="py-3 px-4">
@@ -148,6 +149,7 @@ export default function AdminVehicles() {
                     </td>
                     <td className="py-3 px-4"><Badge variant="outline">{v.category}</Badge></td>
                     <td className="py-3 px-4 font-mono">{v.licensePlate}</td>
+                    <td className="py-3 px-4 font-medium text-foreground">{(v as any).mileage || "15 km/l"}</td>
                     <td className="py-3 px-4 font-medium">₹{Number(v.dailyRate).toLocaleString("en-IN")}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -181,7 +183,7 @@ export default function AdminVehicles() {
           <DialogHeader>
             <DialogTitle>Edit Vehicle</DialogTitle>
             <DialogDescription>
-              Update specifications, availability, pricing, or vehicle imagery.
+              Update specifications, mandatory mileage, availability, pricing, or vehicle imagery.
             </DialogDescription>
           </DialogHeader>
           {editingVehicle && (
@@ -228,6 +230,7 @@ function VehicleForm({ onSubmit, onCancel, defaultValues = {}, isPending }: any)
     transmission: defaultValues.transmission || "Automatic",
     fuelType: defaultValues.fuelType || "Petrol",
     licensePlate: defaultValues.licensePlate || "",
+    mileage: defaultValues.mileage !== undefined && defaultValues.mileage !== null ? String(defaultValues.mileage) : "",
     imageUrl: defaultValues.imageUrl || "",
     description: defaultValues.description || "",
   });
@@ -336,6 +339,16 @@ function VehicleForm({ onSubmit, onCancel, defaultValues = {}, isPending }: any)
     e.preventDefault();
     if (isUploading) return;
 
+    // Mileage is mandatory
+    if (!formData.mileage.trim()) {
+      toast({
+        title: "Mileage is mandatory",
+        description: "Please enter the vehicle mileage before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const parsedData = {
       make: formData.make.trim(),
       model: formData.model.trim(),
@@ -346,6 +359,7 @@ function VehicleForm({ onSubmit, onCancel, defaultValues = {}, isPending }: any)
       transmission: formData.transmission,
       fuelType: formData.fuelType.trim() || "Petrol",
       licensePlate: formData.licensePlate.trim().toUpperCase(),
+      mileage: formData.mileage.trim(),
       imageUrl: formData.imageUrl.trim() || undefined,
       description: formData.description.trim() || undefined,
     };
@@ -453,6 +467,18 @@ function VehicleForm({ onSubmit, onCancel, defaultValues = {}, isPending }: any)
           />
         </div>
         <div className="space-y-2">
+          <Label htmlFor="mileage" className="flex items-center gap-1 font-semibold">
+            Mileage <span className="text-destructive">*</span>
+          </Label>
+          <Input 
+            id="mileage" 
+            required 
+            placeholder="e.g. 15 km/l or 450 km / charge" 
+            value={formData.mileage} 
+            onChange={handleChange} 
+          />
+        </div>
+        <div className="space-y-2 md:col-span-2">
           <Label htmlFor="imageUrl">Image Web URL (Optional)</Label>
           <Input 
             id="imageUrl" 

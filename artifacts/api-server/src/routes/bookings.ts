@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, bookingsTable, usersTable, vehiclesTable } from "@workspace/db";
+import { db, bookingsTable, usersTable, vehiclesTable, cancellationsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { CreateBookingBody, UpdateBookingBody, ListBookingsQueryParams } from "@workspace/api-zod";
 import { tokenStore } from "./auth";
@@ -147,6 +147,21 @@ router.post("/:id/cancel", async (req, res) => {
 
   // Re-enable vehicle
   await db.update(vehiclesTable).set({ isAvailable: true }).where(eq(vehiclesTable.id, booking.vehicleId));
+
+  // Record cancellation in the cancellations table
+  const reason = (req.body && req.body.reason) ? String(req.body.reason) : "Cancelled by customer";
+  try {
+    await db.insert(cancellationsTable).values({
+      bookingId: booking.id,
+      userId: booking.userId,
+      reason,
+      refundAmount: String(booking.totalCost),
+      refundStatus: "pending",
+    });
+  } catch (err) {
+    // Log error if insert fails, but don't fail the cancellation response
+    console.error("Failed to insert cancellation log:", err);
+  }
 
   return res.json(await formatBooking(updated));
 });

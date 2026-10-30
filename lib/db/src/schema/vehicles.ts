@@ -20,6 +20,7 @@ export const vehiclesTable = pgTable("vehicles", {
   isAvailable: boolean("is_available").notNull().default(true),
   licensePlate: text("license_plate").notNull().unique(),
   description: text("description"),
+  mileage: text("mileage"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

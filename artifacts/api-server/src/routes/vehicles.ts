@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { db, vehiclesTable } from "@workspace/db";
-import { eq, ilike, and } from "drizzle-orm";
+import { db, vehiclesTable, reviewsTable } from "@workspace/db";
+import { eq, and, desc } from "drizzle-orm";
 import { CreateVehicleBody, UpdateVehicleBody, ListVehiclesQueryParams } from "@workspace/api-zod";
+import { tokenStore } from "./auth";
 
 const router = Router();
 
@@ -21,6 +22,7 @@ function formatVehicle(v: any) {
     isAvailable: v.isAvailable,
     licensePlate: v.licensePlate,
     description: v.description ?? null,
+    mileage: v.mileage ?? null,
   };
 }
 
@@ -84,6 +86,7 @@ router.post("/", async (req, res) => {
       dailyRate: String(data.dailyRate),
       isAvailable: data.isAvailable ?? true,
       rating: 4.5,
+      mileage: req.body.mileage ? String(req.body.mileage).trim() : null,
     } as any).returning();
 
     return res.status(201).json(formatVehicle(vehicle));
@@ -120,6 +123,9 @@ router.patch("/:id", async (req, res) => {
   if (data.licensePlate !== undefined) {
     updateData.licensePlate = data.licensePlate.trim().toUpperCase();
   }
+  if (req.body.mileage !== undefined) {
+    updateData.mileage = req.body.mileage ? String(req.body.mileage).trim() : null;
+  }
 
   try {
     const [vehicle] = await db.update(vehiclesTable).set(updateData).where(eq(vehiclesTable.id, id)).returning();
@@ -140,6 +146,104 @@ router.delete("/:id", async (req, res) => {
 
   await db.delete(vehiclesTable).where(eq(vehiclesTable.id, id));
   return res.json({ success: true, message: "Vehicle deleted" });
+});
+
+// Reviews endpoints
+router.get("/:id/reviews", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+  try {
+    const reviews = await db
+      .select()
+      .from(reviewsTable)
+      .where(eq(reviewsTable.vehicleId, id))
+      .orderBy(desc(reviewsTable.createdAt));
+
+    const count = reviews.length;
+    const avgRating = count > 0 
+      ? Number((reviews.reduce((acc, r) => acc + r.rating, 0) / count).toFixed(1))
+      : 5.0;
+
+    return res.json({
+      reviews: reviews.map(r => ({
+        id: r.id,
+        vehicleId: r.vehicleId,
+        userId: r.userId,
+        userName: r.userName,
+        rating: r.rating,
+        comment: r.comment,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      averageRating: avgRating,
+      totalReviews: count,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to fetch reviews" });
+  }
+});
+
+router.post("/:id/reviews", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const { rating, comment, userName } = req.body;
+  const parsedRating = parseInt(rating);
+  if (isNaN(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+    return res.status(400).json({ error: "Rating must be between 1 and 5 stars" });
+  }
+  if (!comment || typeof comment !== "string" || !comment.trim()) {
+    return res.status(400).json({ error: "Please write a review comment" });
+  }
+
+  try {
+    // Check auth if provided
+    let userId: number | null = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      userId = tokenStore.get(token) || null;
+    }
+
+    const reviewerName = (userName && String(userName).trim()) || (userId ? `Customer #${userId}` : "Verified Renter");
+
+    const [review] = await db.insert(reviewsTable).values({
+      vehicleId: id,
+      userId: userId ?? undefined,
+      userName: reviewerName,
+      rating: parsedRating,
+      comment: comment.trim(),
+    }).returning();
+
+    // Recalculate average rating
+    const allVehicleReviews = await db
+      .select({ rating: reviewsTable.rating })
+      .from(reviewsTable)
+      .where(eq(reviewsTable.vehicleId, id));
+
+    const total = allVehicleReviews.length;
+    const newAvg = total > 0
+      ? Number((allVehicleReviews.reduce((sum, r) => sum + r.rating, 0) / total).toFixed(1))
+      : 4.5;
+
+    await db.update(vehiclesTable).set({ rating: newAvg }).where(eq(vehiclesTable.id, id));
+
+    return res.status(201).json({
+      review: {
+        id: review.id,
+        vehicleId: review.vehicleId,
+        userId: review.userId,
+        userName: review.userName,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+      },
+      updatedRating: newAvg,
+    });
+  } catch (err: any) {
+    console.error("Error creating review:", err);
+    return res.status(500).json({ error: "Failed to submit review" });
+  }
 });
 
 export default router;
